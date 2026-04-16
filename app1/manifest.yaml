@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1
+  # These labels are replicaset labels reference
+  labels:
+    project: roboshop
+    tier: frontend
+    component: app1
+spec:
+  replicas: 2
+  selector:
+  # Using these labels, replicaset selects the pod.
+    matchLabels:
+      project: roboshop
+      tier: frontend
+      component: app1
+  # This is Pod definition, Pod is subset of replicaset
+  template:
+    metadata:
+      # These MUST match the 'selector' labels specified above
+      labels:
+        project: roboshop
+        tier: frontend
+        component: app1
+    spec:
+      containers:
+      - name: app1
+        image: javeedmohd214/app1:1.0.0
+---
+# A service is a method for exposing a network application that is running on one or more Pods in your cluster.
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1
+spec:
+  selector:
+    # Labels are used as selectors.
+    project: roboshop
+    tier: frontend
+    component: app1
+  ports:
+  - protocol: TCP
+    port: 80          # Service Port
+    targetPort: 80    # Container Port    
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app1
+  annotations:
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: 'arn:aws:acm:us-east-1:996669628469:certificate/b6983d9a-848d-4898-8335-81c74db10bc3'
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/tags: Environment=dev,Project=roboshop
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: roboshop
+spec:
+  ingressClassName: alb
+  rules:
+  - host: "app1.devopsdaws.online"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: app1
+            port:
+              number: 80
