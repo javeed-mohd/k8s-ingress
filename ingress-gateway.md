@@ -3,7 +3,7 @@
 ## Stage 1: Old ALB Ingress Controller
 Created an ALB but had serious problems:
 
-**• target-type: instance** — ALB registered EC2 nodes, not pods. Traffic had to go through NodePort on every node before reaching the pod (extra hop)
+**• target-type: instance** — ALB registered EC2 nodes, not pods. Traffic had to go through NodePort on every node before reaching the pod (extra hop)  
 **• One ALB per app** — no concept of grouping. 10 apps = 10 ALBs = high cost
 **• v1beta1 API** — flat backend syntax, no pathType, ingressClassName via annotation. This API was removed in K8s 1.22
 `Internet → ALB (per app) → EC2 node (NodePort) → pod`
