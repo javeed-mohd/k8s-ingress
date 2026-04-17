@@ -4,9 +4,9 @@
 Created an ALB but had serious problems:
 
 **• target-type: instance** — ALB registered EC2 nodes, not pods. Traffic had to go through NodePort on every node before reaching the pod (extra hop)  
-**• One ALB per app** — no concept of grouping. 10 apps = 10 ALBs = high cost
+**• One ALB per app** — no concept of grouping. 10 apps = 10 ALBs = high cost  
 **• v1beta1 API** — flat backend syntax, no pathType, ingressClassName via annotation. This API was removed in K8s 1.22  
-`Internet → ALB (per app) → EC2 node (NodePort) → pod`
+```Internet → ALB (per app) → EC2 node (NodePort) → pod```
 
 ## Stage 2: AWS Load Balancer Controller (Current)
 Fixed all the above problems:
@@ -14,7 +14,7 @@ Fixed all the above problems:
 **• target-type: ip** — ALB routes directly to pod IP, no NodePort needed  
 **• group.name** — multiple apps share one ALB, much cheaper  
 **• v1 API** — proper pathType, nested backend, ingressClassName in spec  
-`Internet → ALB (shared) → pod (directly)`
+```Internet → ALB (shared) → pod (directly)```
 
 ## What Changed in the API
 | Field               | v1beta1 (old)                                   | v1 (current)                          |
@@ -49,7 +49,7 @@ Splits the Ingress into 3 clean resources:
 | `Gateway`     | Infra Team    | LB config — ports, TLS, scheme                    |
 | `HTTPRoute`   | Dev Team      | Routing rules — host, path, backend               |
 
-`Internet → ALB (Gateway) → pod`
+```Internet → ALB (Gateway) → pod```
 
 Same ALB underneath — only the K8s side is cleaner. Dev team only touches HTTPRoute, infra team owns Gateway. No annotation hacks needed.
 
