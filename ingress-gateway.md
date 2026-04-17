@@ -8,17 +8,22 @@ Created an ALB but had serious problems:
 **• One ALB per app** — no concept of grouping. 10 apps = 10 ALBs = high cost
 
 **• v1beta1 API** — flat backend syntax, no pathType, ingressClassName via annotation. This API was removed in K8s 1.22  
+
 ```Internet → ALB (per app) → EC2 node (NodePort) → pod```
 
 ## Stage 2: AWS Load Balancer Controller (Current)
 Fixed all the above problems:
 
 **• target-type: ip** — ALB routes directly to pod IP, no NodePort needed  
+
 **• group.name** — multiple apps share one ALB, much cheaper  
+
 **• v1 API** — proper pathType, nested backend, ingressClassName in spec  
+
 ```Internet → ALB (shared) → pod (directly)```
 
 ## What Changed in the API
+
 | Field               | v1beta1 (old)                                   | v1 (current)                          |
 |--------------------|--------------------------------------------------|--------------------------------------|
 | apiVersion    | `extensions/v1beta1` → `networking.k8s.io/v1beta1`  | `networking.k8s.io/v1`                 |
@@ -27,6 +32,7 @@ Fixed all the above problems:
 | ingressClassName | annotation                                    | spec field                           |
 
 ## pathType
+
 | pathType                | Behavior                                           |
 |------------------------|----------------------------------------------------|
 | `Exact`                  | `/api` matches only `/api`                          |
@@ -36,6 +42,7 @@ Fixed all the above problems:
 But Ingress itself still has problems.
 
 ## Problems with Ingress API
+
 1. **Annotation hell** Any feature beyond basic host/path routing goes into annotations — no validation, no schema, easy to mistype. And annotations are vendor-specific, so nginx annotations don't work on ALB and vice versa.
 
 2. **No role separation** Infra config (TLS, ports, scheme) and app routing rules live in the same Ingress file. Dev team and infra team both touch the same resource — causes conflicts in real teams.
@@ -59,9 +66,11 @@ Same ALB underneath — only the K8s side is cleaner. Dev team only touches HTTP
 
 # Why Move from Kubernetes Ingress to Gateway API
 ## TL;DR
+
 *"Ingress API is **feature-frozen** — it works today and will continue to work, but no new features will ever be added. All Kubernetes networking innovation is happening in **Gateway API**. Existing Ingress setups don't need immediate migration, but new projects should start with Gateway API directly."*
 
 ## Current State of Ingress API
+
 | Aspect              | Status        |
 |--------------------|--------------|
 | Bug fixes          | ✅ Active     |
@@ -76,10 +85,13 @@ The Kubernetes community has officially stated:
 **Gateway API** became **GA (Generally Available)** in **Kubernetes 1.28 (2023)** and is now where all active development happens.
 
 ## Key Reasons to Move
+
 ### 1. Feature Frozen
-**•** Ingress gets **only** bug fixes and security patches  
-**•** No new capabilities will ever be added  
-**•** Gateway API is where all new Kubernetes networking features land  
+**•** Ingress gets **only** bug fixes and security patches
+
+**•** No new capabilities will ever be added
+
+**•** Gateway API is where all new Kubernetes networking features land
 
 ### 2. Role Separation (Real Production Benefit)
 **Old Ingress** — Everything mixed in one resource, app developer needs AWS/infra knowledge:
