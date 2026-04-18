@@ -22,26 +22,9 @@ Fixed all the above problems:
 
 ```Internet → ALB (shared) → pod (directly)```
 
-## What Changed in the API
-
-| Field               | v1beta1 (old)                                   | v1 (current)                          |
-|--------------------|--------------------------------------------------|--------------------------------------|
-| apiVersion    | `extensions/v1beta1` → `networking.k8s.io/v1beta1`  | `networking.k8s.io/v1`                 |
-| backend      | flat: `serviceName`, `servicePort`                         | nested: `service.name`, `service.port.number`    |
-| pathType      | not required                                     | mandatory                            |
-| ingressClassName | annotation                                    | spec field                           |
-
-## pathType
-
-| pathType                | Behavior                                           |
-|------------------------|----------------------------------------------------|
-| `Exact`                  | `/api` matches only `/api`                          |
-| `Prefix`                 | `/api` matches `/api`, `/api/users`, `/api/orders`  |
-| `ImplementationSpecific` | controller decides                                 |
-
 But Ingress itself still has problems.
 
-## Problems with Ingress API
+## Problems with Ingress API (Why move to Gateway)
 
 1. **Annotation hell** Any feature beyond basic host/path routing goes into annotations — no validation, no schema, easy to mistype. And annotations are vendor-specific, so nginx annotations don't work on ALB and vice versa.
 
@@ -52,17 +35,34 @@ But Ingress itself still has problems.
 ## Stage 3: Gateway API (Future)
 Splits the Ingress into 3 clean resources:
 
-| Resource     | Owner          | Purpose                                           |
-|--------------|---------------|---------------------------------------------------|
+| Resource       | Owner         | Purpose                                           |
+|----------------|---------------|---------------------------------------------------|
 | `GatewayClass` | Cluster Admin | Which controller to use                           |
-| `Gateway`     | Infra Team    | LB config — ports, TLS, scheme                    |
-| `HTTPRoute`   | Dev Team      | Routing rules — host, path, backend               |
+| `Gateway`      | Infra Team    | LB config — ports, TLS, scheme                    |
+| `HTTPRoute`    | Dev Team      | Routing rules — host, path, backend               |
 
 ```Internet → ALB (Gateway) → pod```
 
 Same ALB underneath — only the K8s side is cleaner. Dev team only touches HTTPRoute, infra team owns Gateway. No annotation hacks needed.
 
 **Status**: GA since K8s 1.31. Ingress is in maintenance mode — no new features.
+
+## What Changed in the API
+
+| Field               | v1beta1 (old)                                       | v1 (current)                                     |
+|---------------------|-----------------------------------------------------|--------------------------------------------------|
+| apiVersion          | `extensions/v1beta1` → `networking.k8s.io/v1beta1`  | `networking.k8s.io/v1`                           |
+| backend             | flat: `serviceName`, `servicePort`                  | nested: `service.name`, `service.port.number`    |
+| pathType            | not required                                        | mandatory                                        |
+| ingressClassName    | annotation                                          | spec field                                       |
+
+## pathType
+
+| pathType                 | Behavior                                           |
+|--------------------------|----------------------------------------------------|
+| `Exact`                  | `/api` matches only `/api`                         |
+| `Prefix`                 | `/api` matches `/api`, `/api/users`, `/api/orders` |
+| `ImplementationSpecific` | controller decides                                 |
 
 # Why Move from Kubernetes Ingress to Gateway API
 ## TL;DR
@@ -71,8 +71,8 @@ Same ALB underneath — only the K8s side is cleaner. Dev team only touches HTTP
 
 ## Current State of Ingress API
 
-| Aspect              | Status        |
-|--------------------|--------------|
+| Aspect             | Status        |
+|--------------------|---------------|
 | Bug fixes          | ✅ Active     |
 | Security patches   | ✅ Active     |
 | New features       | ❌ Frozen     |
@@ -113,11 +113,34 @@ Platform/Infra Team  →  GatewayClass + Gateway  (AWS annotations live here)
 App/Dev Team         →  HTTPRoute only           (zero AWS knowledge needed)
 ```
 
-| Role                    | Resource     | Owns                                      |
-|-------------------------|-------------|--------------------------------------------|
-| `Infrastructure Team`     | GatewayClass | Controller config, provider                |
-| `Platform/Ops Team`       | Gateway      | Load balancer config, TLS, ports           |
-| `App/Dev Team`            | HTTPRoute    | Routing rules, path matching               |
+| Role                    | Resource     | Owns                                       |
+|-------------------------|--------------|--------------------------------------------|
+| `Infrastructure Team`   | GatewayClass | Controller config, provider                |
+| `Platform/Ops Team`     | Gateway      | Load balancer config, TLS, ports           |
+| `App/Dev Team`          | HTTPRoute    | Routing rules, path matching               |
+
+### 3. Richer Routing — No More Annotation Hacks
+
+Modern Gateway API removes the need for fragile annotation-based configuration used in Ingress.
+
+| Feature             | Ingress          | Gateway API  |
+|---------------------|------------------|--------------|
+| Canary deployments  | Annotation hack  | Native spec  |
+| Header matching     | Annotation hack  | Native spec  |
+| Traffic splitting   | Annotation hack  | Native spec  |
+| Retries & timeouts  | Annotation hack  | Native spec  |
+| Redirects           | Annotation hack  | Native spec  |
+
+### 4. Multi-Protocol Support
+
+Gateway API extends beyond HTTP and HTTPS, enabling true multi-protocol traffic management.
+
+| Protocol   | Ingress | Gateway API |
+|------------|---------|-------------|
+| HTTP/HTTPS | ✅      | ✅         |
+| TCP        | ❌      | ✅         |
+| UDP        | ❌      | ✅         |
+| gRPC       | ❌      | ✅         |
 
 ## API Version History (for reference)
 
@@ -134,6 +157,33 @@ apiVersion: networking.k8s.io/v1
 # FUTURE — actively developed
 apiVersion: gateway.networking.k8s.io/v1
 ```
+
+## Ingress vs Gateway API — Full Comparison
+
+| Field                | Ingress                | Gateway API                           |
+|----------------------|------------------------|---------------------------------------|
+| API version          | networking.k8s.io/v1   | gateway.networking.k8s.io/v1          |
+| Status               | Stable, feature-frozen | GA since k8s 1.28, actively developed |
+| Routing config       | Inside Ingress spec    | Separate HTTPRoute resource           |
+| Controller config    | Annotation-based       | GatewayClass resource                 |
+| Load balancer config | Annotation-based       | Gateway resource                      |
+| Role separation      | ❌ None                | ✅ Class / Gateway / Route           |
+| Traffic splitting    | ❌ Annotation hack     | ✅ Native                            |
+| Protocol support     | HTTP/HTTPS only         | HTTP, TCP, UDP, gRPC                 |
+
+### Migration Recommendation
+
+| Situation                      | Recommendation                     |
+|--------------------------------|------------------------------------|
+| Existing Ingress in production | ✅ No rush — it still works fine   |
+| New cluster / new project      | 🚀 Start with Gateway API directly |
+| Planning for long term         | 📅 Plan migration to Gateway API   |
+
+### Analogy
+Think of it like **Python 2 Vs Python 3**:
+
+**•Python 2** → still worked, got security patches, no new features → eventually EOL
+**•Ingress**  → same path — works today, but Gateway API is the future
 
 ## Conclusion
 *"Ingress is a stable legacy system — reliable but going nowhere. Gateway API is the future — better role separation, richer features, and all active Kubernetes networking development. Migrate when you can, but don't panic if you haven't yet."*
