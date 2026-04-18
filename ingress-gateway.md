@@ -182,8 +182,9 @@ apiVersion: gateway.networking.k8s.io/v1
 ### Analogy
 Think of it like **Python 2 Vs Python 3**:
 
-**•Python 2** → still worked, got security patches, no new features → eventually EOL
-**•Ingress**  → same path — works today, but Gateway API is the future
+**• Python 2** → still worked, got security patches, no new features → eventually EOL
+
+**• Ingress**  → same path — works today, but Gateway API is the future
 
 ## Conclusion
 *"Ingress is a stable legacy system — reliable but going nowhere. Gateway API is the future — better role separation, richer features, and all active Kubernetes networking development. Migrate when you can, but don't panic if you haven't yet."*
